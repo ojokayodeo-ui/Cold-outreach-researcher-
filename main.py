@@ -1,12 +1,18 @@
+import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from routers import research, icp, personas, campaign, messages, pipeline
 
 app = FastAPI(title="Outreach Intelligence API", version="1.0.0")
 
+# Allow origins: local dev + any configured via ALLOWED_ORIGINS env var
+_raw = os.getenv("ALLOWED_ORIGINS", "")
+_extra = [o.strip() for o in _raw.split(",") if o.strip()]
+allow_origins = ["http://localhost:3000"] + _extra
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "https://your-app.vercel.app"],
+    allow_origins=allow_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
