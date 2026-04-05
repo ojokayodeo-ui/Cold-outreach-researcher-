@@ -1,0 +1,56 @@
+name: Setup Netlify Site (Run Once)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  create-netlify-site:
+    name: Create Netlify Site
+    runs-on: ubuntu-latest
+    steps:
+      - name: Create Netlify site and get Site ID
+        run: |
+          # Check if site already exists
+          SITES=$(curl -s https://api.netlify.com/api/v1/sites \
+            -H "Authorization: Bearer ${{ secrets.NETLIFY_AUTH_TOKEN }}")
+          
+          EXISTING=$(echo $SITES | python3 -c "
+import sys, json
+sites = json.load(sys.stdin)
+for s in sites:
+    if 'cold-outreach' in s.get('name','').lower() or 'outreach-intel' in s.get('name','').lower():
+        print(s['id'], s['ssl_url'])
+        break
+else:
+    print('NONE')
+")
+          
+          if [ "$EXISTING" = "NONE" ]; then
+            echo "Creating new Netlify site..."
+            RESULT=$(curl -s -X POST https://api.netlify.com/api/v1/sites \
+              -H "Authorization: Bearer ${{ secrets.NETLIFY_AUTH_TOKEN }}" \
+              -H "Content-Type: application/json" \
+              -d '{
+                "name": "outreach-intelligence",
+                "custom_domain": null
+              }')
+            SITE_ID=$(echo $RESULT | python3 -c "import sys,json; d=json.load(sys.stdin); print(d['id'])")
+            SITE_URL=$(echo $RESULT | python3 -c "import sys,json; d=json.load(sys.stdin); print(d['ssl_url'])")
+            echo "Created site: $SITE_ID"
+            echo "Site URL: $SITE_URL"
+          else
+            echo "Existing site found: $EXISTING"
+            SITE_ID=$(echo $EXISTING | awk '{print $1}')
+            SITE_URL=$(echo $EXISTING | awk '{print $2}')
+          fi
+          
+          # Set env var on Netlify site
+          curl -s -X PATCH "https://api.netlify.com/api/v1/sites/$SITE_ID" \
+            -H "Authorization: Bearer ${{ secrets.NETLIFY_AUTH_TOKEN }}" \
+            -H "Content-Type: application/json" \
+            -d "{\"build_settings\": {\"env\": {\"NEXT_PUBLIC_API_URL\": \"https://cold-outreach-researcher-production.up.railway.app\"}}}"
+          
+          echo "::notice title=Netlify Site ID::$SITE_ID"
+          echo "::notice title=Netlify Site URL::$SITE_URL"
+          echo "ADD THIS AS GITHUB SECRET - NETLIFY_SITE_ID: $SITE_ID"
+          echo "ADD THIS AS GITHUB SECRET - NETLIFY_SITE_URL: $SITE_URL"

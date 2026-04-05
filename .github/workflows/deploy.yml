@@ -1,0 +1,77 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  configure-railway:
+    name: Set Railway Environment Variables
+    runs-on: ubuntu-latest
+    steps:
+      - name: Set ANTHROPIC_API_KEY on Railway
+        run: |
+          # Query Railway for project/service info
+          RESPONSE=$(curl -s -X POST https://backboard.railway.app/graphql/v2 \
+            -H "Authorization: Bearer ${{ secrets.RAILWAY_TOKEN }}" \
+            -H "Content-Type: application/json" \
+            -d '{"query":"{ me { projects { edges { node { id name environments { edges { node { id name } } } services { edges { node { id name } } } } } } } }"}')
+          
+          echo "Railway projects: $RESPONSE"
+          
+          PROJECT_ID=$(echo $RESPONSE | python3 -c "import sys,json; d=json.load(sys.stdin); print(d['data']['me']['projects']['edges'][0]['node']['id'])")
+          SERVICE_ID=$(echo $RESPONSE | python3 -c "import sys,json; d=json.load(sys.stdin); print(d['data']['me']['projects']['edges'][0]['node']['services']['edges'][0]['node']['id'])")
+          ENV_ID=$(echo $RESPONSE | python3 -c "import sys,json; d=json.load(sys.stdin); print(d['data']['me']['projects']['edges'][0]['node']['environments']['edges'][0]['node']['id'])")
+          
+          echo "Project: $PROJECT_ID, Service: $SERVICE_ID, Env: $ENV_ID"
+          
+          # Set env vars
+          curl -s -X POST https://backboard.railway.app/graphql/v2 \
+            -H "Authorization: Bearer ${{ secrets.RAILWAY_TOKEN }}" \
+            -H "Content-Type: application/json" \
+            -d "{\"query\":\"mutation { variableCollectionUpsert(input: { projectId: \\\"$PROJECT_ID\\\", serviceId: \\\"$SERVICE_ID\\\", environmentId: \\\"$ENV_ID\\\", variables: { ANTHROPIC_API_KEY: \\\"$ANTHROPIC_API_KEY_VAL\\\", ALLOWED_ORIGINS: \\\"$NETLIFY_URL\\\" } }) }\"}" \
+          --data-urlencode ""
+        env:
+          ANTHROPIC_API_KEY_VAL: ${{ secrets.ANTHROPIC_API_KEY }}
+          NETLIFY_URL: ${{ secrets.NETLIFY_SITE_URL }}
+
+  deploy-netlify:
+    name: Deploy Frontend to Netlify
+    runs-on: ubuntu-latest
+    needs: configure-railway
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Build
+        working-directory: frontend
+        env:
+          NEXT_PUBLIC_API_URL: https://cold-outreach-researcher-production.up.railway.app
+        run: npm run build
+
+      - name: Deploy to Netlify
+        uses: nwtgck/actions-netlify@v3
+        with:
+          publish-dir: frontend/.next
+          production-branch: main
+          production-deploy: true
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          deploy-message: "Deploy from GitHub Actions - ${{ github.sha }}"
+          enable-pull-request-comment: false
+          enable-commit-comment: false
+          netlify-config-path: ./netlify.toml
+        env:
+          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+          NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID }}
