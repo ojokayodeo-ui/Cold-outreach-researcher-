@@ -4,120 +4,23 @@
 
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap');
 
-/* ── Light mode tokens ── */
 :root {
-  --bg:              #f8f9fc;
-  --surface:         #ffffff;
-  --surface-muted:   #f8f9fc;
-  --surface-brand:   #f0f4ff;
-  --border:          #e8eaf0;
-  --border-light:    #f3f4f6;
-
-  --text-primary:    #1a1a2e;
-  --text-secondary:  #4b5563;
-  --text-muted:      #6b7280;
-  --text-faint:      #9ca3af;
-  --text-label:      #374151;
-
-  --brand:           #4c6ef5;
-  --brand-dark:      #3b5bdb;
-  --brand-bg:        #f0f4ff;
-  --brand-100:       #dbe4ff;
-  --brand-text:      #2f4ac2;
-
-  --green-bg:        #d3f9d8;
-  --green-text:      #1a7431;
-  --green-subtle:    #f0fdf4;
-  --green-border:    #bbf7d0;
-  --green-dark:      #166534;
-  --green-darker:    #14532d;
-
-  --amber-bg:        #fff3cd;
-  --amber-text:      #7c5a00;
-
-  --red-bg:          #ffe3e3;
-  --red-text:        #a61e1e;
-  --red-subtle:      #fff5f5;
-  --red-border:      #fecaca;
-  --red-strong:      #b91c1c;
-  --red-tag-bg:      #fee2e2;
-  --red-tag-text:    #991b1b;
-  --red-dark:        #7f1d1d;
-
-  --gray-bg:         #f1f3f5;
-  --gray-text:       #495057;
-
-  --cta-bg:          #1a1a2e;
-  --cta-text:        #ffffff;
-  --cta-muted:       #9ca3af;
-
-  --skeleton-1:      #f0f0f0;
-  --skeleton-2:      #e0e0e0;
-}
-
-/* ── Dark mode tokens ── */
-.dark {
-  --bg:              #0f1117;
-  --surface:         #1a1d27;
-  --surface-muted:   #13161f;
-  --surface-brand:   #1e2a4a;
-  --border:          #2d3149;
-  --border-light:    #252838;
-
-  --text-primary:    #e8eaf0;
-  --text-secondary:  #9ca3af;
-  --text-muted:      #6b7280;
-  --text-faint:      #4b5563;
-  --text-label:      #9ca3af;
-
-  --brand:           #4c6ef5;
-  --brand-dark:      #3b5bdb;
-  --brand-bg:        #1e2a4a;
-  --brand-100:       #1e2a4a;
-  --brand-text:      #818cf8;
-
-  --green-bg:        #052e16;
-  --green-text:      #4ade80;
-  --green-subtle:    #052e16;
-  --green-border:    #166534;
-  --green-dark:      #4ade80;
-  --green-darker:    #86efac;
-
-  --amber-bg:        #1c1000;
-  --amber-text:      #fbbf24;
-
-  --red-bg:          #2d0a0a;
-  --red-text:        #f87171;
-  --red-subtle:      #2d1515;
-  --red-border:      #7f1d1d;
-  --red-strong:      #f87171;
-  --red-tag-bg:      #3d0f0f;
-  --red-tag-text:    #fca5a5;
-  --red-dark:        #fca5a5;
-
-  --gray-bg:         #252838;
-  --gray-text:       #9ca3af;
-
-  --cta-bg:          #3b5bdb;
-  --cta-text:        #ffffff;
-  --cta-muted:       #c7d2fe;
-
-  --skeleton-1:      #1e2130;
-  --skeleton-2:      #252838;
+  --brand: #4c6ef5;
+  --brand-dark: #3b5bdb;
 }
 
 * { box-sizing: border-box; }
 
 body {
-  background: var(--bg);
-  color: var(--text-primary);
+  background: #f8f9fc;
+  color: #1a1a2e;
   font-family: 'Inter', system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
 }
 
 .step-card {
-  background: var(--surface);
-  border: 1px solid var(--border);
+  background: white;
+  border: 1px solid #e8eaf0;
   border-radius: 12px;
   padding: 1.5rem;
   margin-bottom: 1rem;
@@ -133,35 +36,35 @@ body {
   letter-spacing: 0.02em;
 }
 
-.badge-blue   { background: var(--brand-100); color: var(--brand-text); }
-.badge-green  { background: var(--green-bg);  color: var(--green-text); }
-.badge-amber  { background: var(--amber-bg);  color: var(--amber-text); }
-.badge-coral  { background: var(--red-bg);    color: var(--red-text);   }
-.badge-gray   { background: var(--gray-bg);   color: var(--gray-text);  }
+.badge-blue   { background: #dbe4ff; color: #2f4ac2; }
+.badge-green  { background: #d3f9d8; color: #1a7431; }
+.badge-amber  { background: #fff3cd; color: #7c5a00; }
+.badge-coral  { background: #ffe3e3; color: #a61e1e; }
+.badge-gray   { background: #f1f3f5; color: #495057; }
 
 .prose-email {
   font-family: 'Inter', sans-serif;
   font-size: 14px;
   line-height: 1.8;
-  color: var(--text-secondary);
+  color: #374151;
   white-space: pre-wrap;
 }
 
 .skeleton {
-  background: linear-gradient(90deg, var(--skeleton-1) 25%, var(--skeleton-2) 50%, var(--skeleton-1) 75%);
+  background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
   background-size: 200% 100%;
   animation: shimmer 1.5s infinite;
   border-radius: 6px;
 }
 
 @keyframes shimmer {
-  0%   { background-position: 200% 0; }
+  0% { background-position: 200% 0; }
   100% { background-position: -200% 0; }
 }
 
 .progress-bar {
   height: 3px;
-  background: var(--border);
+  background: #e8eaf0;
   border-radius: 99px;
   overflow: hidden;
 }
