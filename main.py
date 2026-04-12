@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from routers import research, icp, personas, campaign, messages, pipeline
+from routers import research, icp, personas, campaign, messages, pipeline, scrape_report
 
 app = FastAPI(title="Outreach Intelligence API", version="1.0.0")
 
@@ -18,6 +18,7 @@ app.include_router(icp.router, prefix="/api/icp", tags=["icp"])
 app.include_router(personas.router, prefix="/api/personas", tags=["personas"])
 app.include_router(campaign.router, prefix="/api/campaign", tags=["campaign"])
 app.include_router(messages.router, prefix="/api/messages", tags=["messages"])
+app.include_router(scrape_report.router, prefix="/api/prospect-report", tags=["prospect-report"])
 
 @app.get("/health")
 async def health():

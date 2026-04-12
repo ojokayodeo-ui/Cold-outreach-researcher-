@@ -1,13 +1,17 @@
 "use client";
 import { useState } from "react";
-import { streamPipeline, PipelineResult, Research, ICP, Persona, Campaign, Messages } from "@/lib/api";
+import {
+  streamPipeline, generateProspectReport,
+  PipelineResult, Research, ICP, Persona, Campaign, Messages, ProspectReport,
+} from "@/lib/api";
 import ResearchView from "@/components/ResearchView";
 import ICPView from "@/components/ICPView";
 import PersonasView from "@/components/PersonasView";
 import CampaignView from "@/components/CampaignView";
 import MessagesView from "@/components/MessagesView";
+import CompanyReportView from "@/components/CompanyReportView";
 
-const STEPS = ["Input", "Research", "ICP", "Personas", "Campaign", "Messages"];
+const STEPS = ["Input", "Research", "ICP", "Personas", "Campaign", "Messages", "Report"];
 
 const INDUSTRIES = [
   "Healthcare consulting",
@@ -33,12 +37,19 @@ export default function Home() {
   const [geography, setGeography] = useState("United Kingdom");
   const [companySize, setCompanySize] = useState("5–50 employees");
   const [selectedAngle, setSelectedAngle] = useState("pain-based");
+  const [prospectUrl, setProspectUrl] = useState("");
 
   const [research, setResearch] = useState<Research | null>(null);
   const [icp, setIcp] = useState<ICP | null>(null);
   const [personas, setPersonas] = useState<Persona[]>([]);
   const [campaign, setCampaign] = useState<Campaign | null>(null);
   const [messages, setMessages] = useState<Messages | null>(null);
+
+  // Prospect report state
+  const [reportUrl, setReportUrl] = useState("");
+  const [report, setReport] = useState<ProspectReport | null>(null);
+  const [reportLoading, setReportLoading] = useState(false);
+  const [reportError, setReportError] = useState("");
 
   async function handleRun() {
     if (!industry.trim()) { setError("Please enter a target industry."); return; }
@@ -47,6 +58,10 @@ export default function Home() {
     setStep(1);
     setProgress(0);
 
+    let latestResearch: Research | null = null;
+    let latestPersonas: Persona[] = [];
+    let latestCampaign: Campaign | null = null;
+
     try {
       const stream = streamPipeline({ industry, geography, company_size: companySize, selected_angle: selectedAngle });
       for await (const event of stream) {
@@ -54,15 +69,18 @@ export default function Home() {
           setStatus(event.data.message);
           setProgress(Math.round((event.data.step / event.data.total) * 100));
         } else if (event.step === "research") {
+          latestResearch = event.data;
           setResearch(event.data);
           setStep(2);
         } else if (event.step === "icp") {
           setIcp(event.data);
           setStep(3);
         } else if (event.step === "personas") {
+          latestPersonas = event.data.personas;
           setPersonas(event.data.personas);
           setStep(4);
         } else if (event.step === "campaign") {
+          latestCampaign = event.data;
           setCampaign(event.data);
           setStep(5);
         } else if (event.step === "messages") {
@@ -79,12 +97,61 @@ export default function Home() {
       setLoading(false);
       setStatus("");
     }
+
+    // Auto-generate prospect report if a URL was provided
+    if (prospectUrl.trim() && latestResearch) {
+      const urlToUse = prospectUrl.trim();
+      setReportUrl(urlToUse);
+      setReportLoading(true);
+      setReportError("");
+      setStep(7);
+      try {
+        const result = await generateProspectReport({
+          url: urlToUse,
+          pipeline_data: {
+            research: latestResearch ?? undefined,
+            personas: latestPersonas.length > 0 ? latestPersonas : undefined,
+            campaign: latestCampaign ?? undefined,
+          },
+        });
+        setReport(result);
+      } catch (e: any) {
+        setReportError(e.message || "Report generation failed.");
+      } finally {
+        setReportLoading(false);
+      }
+    }
+  }
+
+  async function handleGenerateReport() {
+    if (!reportUrl.trim()) return;
+    setReportLoading(true);
+    setReportError("");
+    setReport(null);
+    try {
+      const result = await generateProspectReport({
+        url: reportUrl.trim(),
+        pipeline_data: research ? {
+          research: research ?? undefined,
+          personas: personas.length > 0 ? personas : undefined,
+          campaign: campaign ?? undefined,
+        } : null,
+      });
+      setReport(result);
+      setStep(7);
+    } catch (e: any) {
+      setReportError(e.message || "Report generation failed.");
+    } finally {
+      setReportLoading(false);
+    }
   }
 
   function reset() {
     setStep(0); setResearch(null); setIcp(null);
     setPersonas([]); setCampaign(null); setMessages(null);
     setError(""); setProgress(0);
+    setReport(null); setReportUrl(""); setReportError("");
+    setProspectUrl("");
   }
 
   return (
@@ -133,12 +200,46 @@ export default function Home() {
           </div>
         )}
 
-        {step === 0 && <InputForm {...{ industry, setIndustry, geography, setGeography, companySize, setCompanySize, selectedAngle, setSelectedAngle, handleRun, loading, error }} />}
+        {step === 0 && (
+          <InputForm
+            {...{ industry, setIndustry, geography, setGeography, companySize, setCompanySize,
+                 selectedAngle, setSelectedAngle, prospectUrl, setProspectUrl,
+                 handleRun, loading, error }}
+          />
+        )}
+
         {step >= 2 && research && <ResearchView data={research} />}
         {step >= 3 && icp && <ICPView data={icp} />}
         {step >= 4 && personas.length > 0 && <PersonasView data={personas} />}
         {step >= 5 && campaign && <CampaignView data={campaign} onAngleSelect={setSelectedAngle} selectedAngle={selectedAngle} />}
         {step >= 6 && messages && <MessagesView data={messages} />}
+
+        {/* Prospect Report — shown after messages, or triggered manually */}
+        {step >= 6 && !report && !reportLoading && (
+          <ProspectReportPrompt
+            reportUrl={reportUrl}
+            setReportUrl={setReportUrl}
+            onGenerate={handleGenerateReport}
+            reportError={reportError}
+          />
+        )}
+
+        {reportLoading && (
+          <div className="step-card" style={{ textAlign: "center", padding: "32px 24px" }}>
+            <div style={{ fontSize: 13, color: "#6b7280", marginBottom: 12 }}>Scraping website and generating prospect report…</div>
+            <div className="progress-bar" style={{ maxWidth: 300, margin: "0 auto" }}>
+              <div className="progress-fill" style={{ width: "60%", animation: "none", background: "#4c6ef5" }} />
+            </div>
+          </div>
+        )}
+
+        {reportError && !reportLoading && (
+          <div style={{ background: "#fff5f5", border: "1px solid #fecaca", borderRadius: 10, padding: "12px 16px", marginBottom: 16, fontSize: 13, color: "#b91c1c" }}>
+            Report error: {reportError}
+          </div>
+        )}
+
+        {report && <CompanyReportView data={report} url={reportUrl} />}
 
         {loading && step >= 2 && (
           <div className="step-card" style={{ opacity: 0.5 }}>
@@ -152,7 +253,49 @@ export default function Home() {
   );
 }
 
-function InputForm({ industry, setIndustry, geography, setGeography, companySize, setCompanySize, selectedAngle, setSelectedAngle, handleRun, loading, error }: any) {
+function ProspectReportPrompt({ reportUrl, setReportUrl, onGenerate, reportError }: {
+  reportUrl: string;
+  setReportUrl: (v: string) => void;
+  onGenerate: () => void;
+  reportError: string;
+}) {
+  return (
+    <div className="step-card" style={{ borderStyle: "dashed", borderColor: "#c7d2fe" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
+        <div style={{ width: 28, height: 28, borderRadius: 8, background: "#f0f4ff", display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <svg width="15" height="15" viewBox="0 0 16 16" fill="none">
+            <circle cx="8" cy="8" r="6" stroke="#4c6ef5" strokeWidth="1.5"/>
+            <path d="M5 8l2 2 4-4" stroke="#4c6ef5" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+        </div>
+        <div>
+          <div style={{ fontSize: 14, fontWeight: 600, color: "#1a1a2e" }}>Generate Prospect Report</div>
+          <div style={{ fontSize: 12, color: "#6b7280" }}>Scrape a prospect's website to get a personalised outreach report + downloadable PDF</div>
+        </div>
+      </div>
+      <div style={{ display: "flex", gap: 10 }}>
+        <input
+          type="url"
+          value={reportUrl}
+          onChange={e => setReportUrl(e.target.value)}
+          onKeyDown={e => e.key === "Enter" && reportUrl.trim() && onGenerate()}
+          placeholder="https://prospect-company.com"
+          style={{ flex: 1, padding: "10px 14px", border: "1px solid #e8eaf0", borderRadius: 8, fontSize: 14, outline: "none", background: "white" }}
+        />
+        <button
+          onClick={onGenerate}
+          disabled={!reportUrl.trim()}
+          style={{ padding: "10px 20px", background: reportUrl.trim() ? "#4c6ef5" : "#c7d2fe", color: "white", border: "none", borderRadius: 8, fontSize: 14, fontWeight: 600, cursor: reportUrl.trim() ? "pointer" : "not-allowed", whiteSpace: "nowrap" }}
+        >
+          Generate report
+        </button>
+      </div>
+      {reportError && <div style={{ marginTop: 8, fontSize: 12, color: "#b91c1c" }}>{reportError}</div>}
+    </div>
+  );
+}
+
+function InputForm({ industry, setIndustry, geography, setGeography, companySize, setCompanySize, selectedAngle, setSelectedAngle, prospectUrl, setProspectUrl, handleRun, loading, error }: any) {
   return (
     <div>
       <div style={{ textAlign: "center", marginBottom: "2.5rem", paddingTop: "1rem" }}>
@@ -200,7 +343,7 @@ function InputForm({ industry, setIndustry, geography, setGeography, companySize
           </div>
         </div>
 
-        <div style={{ marginBottom: 24 }}>
+        <div style={{ marginBottom: 20 }}>
           <label style={{ display: "block", fontSize: 13, fontWeight: 500, color: "#374151", marginBottom: 8 }}>Primary campaign angle</label>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 }}>
             {["pain-based","opportunity-based","competitor-based","data-driven","curiosity-based","authority-based"].map(a => (
@@ -211,17 +354,35 @@ function InputForm({ industry, setIndustry, geography, setGeography, companySize
           </div>
         </div>
 
+        {/* Prospect URL — optional */}
+        <div style={{ marginBottom: 24 }}>
+          <label style={{ display: "block", fontSize: 13, fontWeight: 500, color: "#374151", marginBottom: 6 }}>
+            Prospect website <span style={{ fontSize: 12, fontWeight: 400, color: "#9ca3af" }}>(optional — generates a downloadable personalised report)</span>
+          </label>
+          <input
+            type="url"
+            value={prospectUrl}
+            onChange={e => setProspectUrl(e.target.value)}
+            placeholder="https://prospect-company.com"
+            style={{ width: "100%", padding: "10px 14px", border: "1px solid #e8eaf0", borderRadius: 8, fontSize: 14, outline: "none", background: "white" }}
+          />
+        </div>
+
         <button onClick={handleRun} disabled={loading || !industry.trim()} style={{ width: "100%", padding: "12px", background: loading || !industry.trim() ? "#c7d2fe" : "#4c6ef5", color: "white", border: "none", borderRadius: 10, fontSize: 15, fontWeight: 600, cursor: loading || !industry.trim() ? "not-allowed" : "pointer", transition: "background 0.15s" }}>
           {loading ? "Generating campaign…" : "Generate campaign →"}
         </button>
 
         <p style={{ textAlign: "center", fontSize: 12, color: "#9ca3af", marginTop: 12 }}>
-          Takes 60–90 seconds · All 5 steps run automatically
+          Takes 60–90 seconds · All 5 steps run automatically{prospectUrl.trim() ? " · Prospect report included" : ""}
         </p>
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 12, maxWidth: 560, margin: "2rem auto 0" }}>
-        {[["Research", "Market trends, pain points, buying triggers"], ["ICP + Personas", "Ideal customer profile and decision-maker archetypes"], ["Outreach", "Email sequences and LinkedIn messages, ready to send"]].map(([t, d]) => (
+        {[
+          ["Research", "Market trends, pain points, buying triggers"],
+          ["ICP + Personas", "Ideal customer profile and decision-maker archetypes"],
+          ["Outreach", "Email sequences, LinkedIn messages, and a downloadable prospect report"],
+        ].map(([t, d]) => (
           <div key={t} style={{ background: "white", border: "1px solid #e8eaf0", borderRadius: 10, padding: "14px" }}>
             <div style={{ fontWeight: 500, fontSize: 13, color: "#1a1a2e", marginBottom: 4 }}>{t}</div>
             <div style={{ fontSize: 12, color: "#9ca3af", lineHeight: 1.5 }}>{d}</div>

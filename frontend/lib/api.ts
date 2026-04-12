@@ -122,6 +122,87 @@ export type StreamStep =
   | { step: "complete"; data: { message: string } }
   | { step: "error"; data: { message: string } };
 
+// ─── Prospect Report ────────────────────────────────────────────────────────
+
+export interface ProspectReportRequest {
+  url: string;
+  pipeline_data?: {
+    research?: object;
+    icp?: object;
+    personas?: object[];
+    campaign?: object;
+  } | null;
+}
+
+export interface CompanySnapshot {
+  company_name: string;
+  industry: string;
+  what_they_do: string;
+  company_stage: string;
+  key_offerings: string[];
+  positioning_statement: string;
+}
+
+export interface InferredPainPoint {
+  pain: string;
+  evidence: string;
+  how_to_use: string;
+}
+
+export interface PersonalizedHook {
+  hook: string;
+  source: string;
+}
+
+export interface OutreachIntelligence {
+  inferred_pain_points: InferredPainPoint[];
+  personalized_hooks: PersonalizedHook[];
+  avoid_these: string[];
+  best_angle: string;
+}
+
+export interface ProspectEmail {
+  email_number: number;
+  send_day: number;
+  subject_line: string;
+  preview_text: string;
+  body: string;
+  cta: string;
+  personalization_note: string;
+}
+
+export interface ProspectLinkedIn {
+  connection_request: string;
+  follow_up_dm: string;
+}
+
+export interface ResearchNotes {
+  estimated_research_time: string;
+  additional_research_to_do: string[];
+  key_facts_found: string[];
+}
+
+export interface ProspectReport {
+  company_snapshot: CompanySnapshot;
+  outreach_intelligence: OutreachIntelligence;
+  personalized_emails: ProspectEmail[];
+  linkedin_messages: ProspectLinkedIn;
+  research_notes: ResearchNotes;
+}
+
+export async function generateProspectReport(req: ProspectReportRequest): Promise<ProspectReport> {
+  const res = await fetch(`${API}/api/prospect-report/generate`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(req),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: "Unknown error" }));
+    throw new Error(err.detail || "Report generation failed");
+  }
+  return res.json();
+}
+
 export async function* streamPipeline(input: PipelineInput): AsyncGenerator<StreamStep> {
   const res = await fetch(`${API}/api/pipeline/stream`, {
     method: "POST",
